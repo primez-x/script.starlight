@@ -1,0 +1,27 @@
+name: Publish check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check publish rules
+        env:
+          PRIMEZ_BEFORE_SHA: ${{ github.event.before }}
+        run: python3 .githooks/publish_check.py ci
