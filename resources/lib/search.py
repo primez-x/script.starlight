@@ -155,11 +155,18 @@ def provider_record(item, source, kind):
     path = item.get('file') or ''
     parsed = urlsplit(path)
     params = parse_qs(parsed.query)
-    if parsed.scheme != 'plugin' or parsed.fragment or kind not in SHAPES:
+    relay = source == 'spotify' and kind == 'song' and parsed.scheme == 'http'
+    if (parsed.scheme != 'plugin' and not relay) or parsed.fragment or kind not in SHAPES:
         raise ValueError('Unsupported provider path.')
     if any(len(values) != 1 for values in params.values()):
         raise ValueError('Duplicate provider arguments are unsupported.')
-    if source == 'spotify':
+    if relay:
+        match = re.fullmatch(r'/track/([A-Za-z0-9]{22})/[1-9][0-9]*ms\.xwav', parsed.path)
+        if (not match or parsed.query or parsed.port is None or not 1024 <= parsed.port <= 65535
+                or parsed.netloc != '127.0.0.1:' + str(parsed.port)):
+            raise ValueError('Unsupported Spotify relay.')
+        ident = match[1]
+    elif source == 'spotify':
         if parsed.netloc != 'plugin.audio.spotifykodiconnect' or parsed.path not in ('', '/'):
             raise ValueError('Unsupported Spotify provider.')
         action, key = {'song': (('play_in_queue',), 'track'), 'album': (('browse_album',), 'albumid'),
@@ -407,10 +414,11 @@ def select(args):
     if set(args) - {'window', 'control'}:
         raise ValueError('Unknown selection argument.')
     window, mapping = target(args)
-    item = window.getControl(next(iter(mapping.values()))).getSelectedItem()
-    if item is None:
+    control = next(iter(mapping.values()))
+    raw = xbmc.getInfoLabel(f'Container({control}).ListItem.Property({PREFIX}Record)')
+    if not raw:
         return
-    record = json.loads(item.getProperty(PREFIX + 'Record'))
+    record = json.loads(raw)
     activate(record)
     query = home().getProperty(PREFIX + 'Query')
     if query:

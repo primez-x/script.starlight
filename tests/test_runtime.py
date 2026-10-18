@@ -10,6 +10,7 @@ missing pagination; unavailable providers; stale requests; invalid playback IDs;
 empty query; malformed input; unsupported commands; unbounded control IDs.
 """
 import importlib
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -289,6 +290,22 @@ class SearchTests(RuntimeCase):
         self.assertFalse(control.items)
         self.assertEqual(self.home.getProperty('Starlight.Search.Busy'), '')
 
+    def test_selection_reads_native_record_with_an_empty_wrapper(self):
+        self.kodi.responses['Player.Open'] = {'result': 'OK'}
+        record = self.record('Dune song', kind='song', ident=27)
+        self.kodi.labels['Container(614).ListItem.Property(Starlight.Search.Record)'] = json.dumps(record)
+        self.home.setProperty('Starlight.Search.Query', 'dune')
+        self.module('search').select({'window': '11100', 'control': '614'})
+        self.assertEqual(self.kodi.calls[-1]['params'], {'item': {'songid': 27}})
+        self.assertEqual(json.loads(self.home.getProperty('Starlight.Search.Recent')), ['dune'])
+
+    def test_empty_native_selection_has_no_action_or_recent_query(self):
+        self.home.setProperty('Starlight.Search.Query', 'dune')
+        self.module('search').select({'window': '11100', 'control': '614'})
+        self.assertFalse(self.kodi.calls)
+        self.assertFalse(self.kodi.builtins)
+        self.assertFalse(self.home.getProperty('Starlight.Search.Recent'))
+
     def test_newer_request_prevents_stale_results(self):
         search = self.module('search')
         def respond(params):
@@ -336,6 +353,20 @@ class ProviderContractTests(RuntimeCase):
         self.module('actions').run('music.album', {})
         self.assertEqual(self.kodi.builtins, ['ActivateWindow(Music,"plugin://plugin.audio.spotifykodiconnect/?action=browse_album&albumid=1111111111111111111111",return)'])
 
+    def test_spotify_relay_song_identity_and_playback(self):
+        path = 'http://127.0.0.1:52309/track/0123456789ABCDEFGHIJKL/283636ms.xwav'
+        self.kodi.responses['Player.Open'] = {'result': 'OK'}
+        search = self.module('search')
+        record = search.provider_record({'file': path, 'title': 'Awake'}, 'spotify', 'song')
+        self.assertEqual(record['id'], '0123456789ABCDEFGHIJKL')
+        search.activate(record)
+        self.assertEqual(self.kodi.calls[-1]['params'], {'item': {'file': path}})
+        for bad in (path.replace('127.0.0.1', 'example.com'), path.replace('52309', '80'),
+                    path + '?other=1', path + '#fragment', path.replace('/track/', '/other/'),
+                    path.replace('283636ms', '0ms'), path.replace('127.0.0.1', 'name@127.0.0.1')):
+            with self.subTest(path=bad), self.assertRaises(ValueError):
+                search.provider_record({'file': bad, 'title': 'Awake'}, 'spotify', 'song')
+
     def test_plex_contract_search_and_item_action_stay_separate(self):
         self.kodi.conditions.add('System.HasAddon(plugin.video.plexkodiconnect)')
         def response(params):
@@ -382,6 +413,8 @@ class ProviderContractTests(RuntimeCase):
         search.run({'query': 'dune', 'rows': 'top:510|music:511'})
         self.assertEqual(self.kodi.window(11101).getControl(510).items[0].label, 'Dune song')
         self.kodi.responses['Player.Open'] = {'result': 'OK'}
+        native = self.kodi.window(11101).getControl(511).items[0]
+        self.kodi.labels['Container(511).ListItem.Property(Starlight.Search.Record)'] = native.getProperty('Starlight.Search.Record')
         search.select({'window': '11101', 'control': '511'})
         self.assertEqual(self.kodi.calls[-1]['method'], 'Player.Open')
         self.assertEqual(self.kodi.calls[-1]['params'], {'item': {'songid': 5}})
