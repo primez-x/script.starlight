@@ -254,6 +254,18 @@ class SearchTests(RuntimeCase):
         self.assertFalse(search.rank('toile', records)['top'])
         self.assertFalse(search.rank('', records)['top'])
 
+    def test_album_candidates_use_the_kodi_album_filter(self):
+        def albums(params):
+            if params['filter'] != {'field':'album', 'operator':'contains', 'value':'Dune'}:
+                return {'error': {'code': -32602}}
+            return {'result': {'albums': [{'albumid': 7, 'title':'Dune soundtrack'}]}}
+        self.kodi.responses['AudioLibrary.GetSongs'] = {'result': {}}
+        self.kodi.responses['AudioLibrary.GetArtists'] = {'result': {}}
+        self.kodi.responses['AudioLibrary.GetAlbums'] = albums
+        records, errors = self.module('search').collect('Dune', False, False)
+        self.assertNotIn('music', errors)
+        self.assertIn('Dune soundtrack', [record['title'] for record in records])
+
     def test_pagination_and_failure_preserve_other_local_sources(self):
         self.kodi.responses['VideoLibrary.GetMovies'] = lambda p: {'result': {'movies': [
             {'movieid': p['limits']['start'] + 1, 'title': 'Dune', 'resume': {'position': 0}, 'playcount': 0}],

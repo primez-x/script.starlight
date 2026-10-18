@@ -115,7 +115,9 @@ def collect(query, spotify=False, plex=False, current=lambda: True):
         params = {'properties': fields}
         if kind != 'set':
             params['filter'] = ({'field': 'artist', 'operator': 'contains', 'value': term}
-                                if kind == 'artist' else title_filter)
+                                if kind == 'artist' else
+                                {'field': 'album', 'operator': 'contains', 'value': term}
+                                if kind == 'album' else title_filter)
         try:
             for item in pages(method, key, params, current):
                 records.append(library_record(item, kind))
