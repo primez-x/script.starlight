@@ -8,7 +8,7 @@
 - Keep provider credentials inside the provider add-ons.
 - Keep queue ownership with Kodi and the music provider.
 - Keep hub settings in native skin strings and booleans.
-- Preserve the placeholder license until the owner chooses a license.
+- License: GPL-2.0-or-later (`LICENSE.txt`).
 
 ## Verify
 

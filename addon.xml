@@ -9,7 +9,7 @@
     <summary lang="en_GB">Music queue and search helpers for Starlight.</summary>
     <description lang="en_GB">Publishes next-track metadata and the final fifteen-second countdown. Routes music actions through Spotify Kodi Connect and ranks native library search results with optional Spotify and Plex sources.</description>
     <platform>all</platform>
-    <license>All rights reserved</license>
+    <license>GPL-2.0-or-later</license>
     <news>v1.0.0
 Add the Starlight next-track service, Spotify music actions, and ranked library search.</news>
     <assets>
